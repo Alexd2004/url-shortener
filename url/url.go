@@ -38,12 +38,7 @@ func generateID() (string, error) {
 	return base64.RawURLEncoding.EncodeToString(data[:]), nil
 }
 
-// Define a database named 'url', using the database
-// migrations in the "./migrations" folder.
 
-var db = sqldb.NewDatabase("url", sqldb.DatabaseConfig{
-	Migrations: "./migrations",
-})
 
 // insert inserts a URL into the database.
 func insert(ctx context.Context, id, url string) error {
@@ -52,6 +47,36 @@ func insert(ctx context.Context, id, url string) error {
         VALUES ($1, $2)
     `, id, url)
 	return err
+}
+
+type ListResponse struct {
+
+	URLs []*URL
+
+}
+// List retrieves all URLs.
+ //
+ //encore:api public method=GET path=/url
+
+ func List(ctx context.Context) (*ListResponse, error) {
+
+	rows, err := db.Query(ctx, `SELECT id, original_url FROM url`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	urls := []*URL{}
+	for rows.Next() {
+		var u URL
+		if err := rows.Scan(&u.ID, &u.URL); err != nil {
+			return nil, err
+		}
+		urls = append(urls, &u)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return &ListResponse{URLs: urls}, nil
 }
 
 // Get retrieves the original URL for the id.
@@ -65,3 +90,9 @@ func Get(ctx context.Context, id string) (*URL, error) {
 	return u, err
 }
 
+// Define a database named 'url', using the database
+// migrations in the "./migrations" folder.
+
+var db = sqldb.NewDatabase("url", sqldb.DatabaseConfig{
+	Migrations: "./migrations",
+})
