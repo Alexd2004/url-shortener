@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encore.dev/storage/sqldb"
+	"encore.dev/pubsub"
 )
 
 type URL struct {
@@ -16,6 +17,10 @@ type URL struct {
 type ShortenParams struct {
 	URL string // the URL to shorten
 }
+
+var EmailAdded = pubsub.NewTopic[*URL]("email-added", pubsub.TopicConfig{
+	DeliveryGuarantee: pubsub.AtLeastOnce,
+})
 
 // Shorten shortens a URL.
 //encore:api public method=POST path=/url
@@ -42,10 +47,17 @@ func generateID() (string, error) {
 
 // insert inserts a URL into the database.
 func insert(ctx context.Context, id, url string) error {
+
+
 	_, err := db.Exec(ctx, `
         INSERT INTO url (id, original_url)
         VALUES ($1, $2)
     `, id, url)
+
+	if _, err := EmailAdded.Publish(ctx, &URL{ID: id, URL: url}); err != nil {
+		return err
+	}
+
 	return err
 }
 
